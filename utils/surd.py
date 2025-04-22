@@ -404,8 +404,8 @@ def plot_states(data, bins, target, source, save_path, title,
         im = ax_main.imshow(data, vmin=vmin, vmax=vmax, cmap=cmap, interpolation='bicubic',
                             extent=extent, origin='lower')
 
-    ax_main.set_xlim([bins[source-1][0],bins[source-1][-1]])
-    ax_main.set_ylim([bins[target-1][0],bins[target-1][-1]])
+    ax_main.set_ylim([bins[source-1][0],bins[source-1][-1]])
+    ax_main.set_xlim([bins[target-1][0],bins[target-1][-1]])
     ax_main.set_xlabel(xlabel, fontsize=fs, labelpad=0)
     ax_main.set_ylabel(ylabel, fontsize=fs, labelpad=5)
     ax_main.axvline(0, color='k', linewidth=1.5)
@@ -421,7 +421,7 @@ def plot_states(data, bins, target, source, save_path, title,
 
     ax_top.plot(interp_x, interp_y, color='black', linewidth=1.25)
     ax_top.fill_between(interp_x, interp_y, 0, color=my_colors['gray'])
-    ax_main.set_xlim([bin_centers_x[0],bin_centers_x[-1]])
+    ax_top.set_xlim([bin_centers_x[0],bin_centers_x[-1]])
     ax_top.set_ylim(bottom=0)
     ax_top.tick_params(axis='x', bottom=False, labelbottom=False)
     ax_top.axhline(0, color='k', linewidth=1.5)
@@ -437,7 +437,7 @@ def plot_states(data, bins, target, source, save_path, title,
     ax_right.plot(interp_vals, interp_ygrid, color='black', linewidth=1.25)
     ax_right.fill_betweenx(interp_ygrid, 0, interp_vals, color=my_colors['gray'])
     ax_right.set_xlim(left=0)
-    ax_main.set_ylim([bin_centers_y[0],bin_centers_y[-1]])
+    ax_right.set_ylim([bin_centers_y[0],bin_centers_y[-1]])
     ax_right.tick_params(axis='y', left=False, labelleft=False)
     ax_right.axvline(0, color='k', linewidth=1.5)
 
