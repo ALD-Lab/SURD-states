@@ -8,6 +8,8 @@ future states. The effectiveness of the proposed approach stems from two key fea
 to characterize causal influence as a function of the system state, and its capacity to distinguish
 both redundant and synergistic effects among variables. The formulation is non-intrusive and requires only pairs of past and future events, facilitating its application in both computational and experimental investigations. The method also identifies the amount of causality that remains unaccounted for due to unobserved variables. The approach can be used to detect causal relationships in systems with multiple variables, dependencies at different time lags, and instantaneous links.
 
+<img width="1117" alt="fig_surd_states" src="https://github.com/user-attachments/assets/ec95e19b-cd90-4881-9d77-eddd334e572d" />
+
 ## System requirements
 
 SURD is designed to operate efficiently on standard computing systems. However, the computational demands increase with the complexity of the probability density functions being estimated. To ensure optimal performance, we recommend a minimum of 16 GB of RAM and a quad-core processor with a clock speed of at least 3.3 GHz per core. The performance metrics provided in this repository are based on tests conducted on macOS with an ARM64 architecture and 16 GB of RAM, and on Linux systems running Red Hat version 8.8-0.8. These configurations have demonstrated sufficient performance for the operations utilized by SURD. Users should consider equivalent or superior specifications to achieve similar performance.
