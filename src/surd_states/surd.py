@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pymp
 import matplotlib.pyplot as plt
@@ -71,10 +72,10 @@ def surd_states(p: np.ndarray) -> Tuple[Dict, Dict, Dict, float, float]:
 
     >>> I_R, I_S, MI, info_leak, Rd_states, Un_states, Sy_states = surd_states(p)
     """
-    # Ensure no zero values in the probability distribution to avoid NaNs during log computations
-    p += 1e-14
-    # Normalize the distribution
-    p /= p.sum()
+    # Normalize the distribution. Zero-valued entries are handled downstream
+    # by ``it.mylog`` (returns 0 for 0/NaN/inf) and ``it.safe_div`` (returns 0
+    # when the denominator is 0), so no additive regularization is needed.
+    p = p / p.sum()
 
     # Total number of dimensions (target + agents)
     Ntot = p.ndim
@@ -105,8 +106,8 @@ def surd_states(p: np.ndarray) -> Tuple[Dict, Dict, Dict, float, float]:
             p_a = p.sum(axis=(0, *noj), keepdims=True)
             p_as = p.sum(axis=noj, keepdims=True)
 
-            p_a_s = p_as / p_s
-            p_s_a = p_as / p_a
+            p_a_s = it.safe_div(p_as, p_s)
+            p_s_a = it.safe_div(p_as, p_a)
 
             # Compute specific mutual information
             Is[j] = (p_a_s * (it.mylog(p_s_a) - it.mylog(p_s))).sum(axis=j).ravel()
@@ -119,14 +120,18 @@ def surd_states(p: np.ndarray) -> Tuple[Dict, Dict, Dict, float, float]:
     I_S = {cc: 0 for cc in combs[Nvars:]}
 
     # Specific unique contributions from one state of one variable to one state of the target variable
-    # Un_states: dict[agent] that contains an array of size Nbins x Nbins
-    Un_states = {(agent,): np.zeros((Nt, Nt)) for agent in inds}
+    # Un_states: dict[agent] that contains an array of size (Nt, Nbins_agent)
+    Un_states = {(agent,): np.zeros((Nt, p.shape[agent])) for agent in inds}
     Sy_states = {}
     Rd_states = {}
     for i, agenti in enumerate(inds):
         for agentj in inds[i + 1 :]:
-            Sy_states[(agenti, agentj)] = np.zeros((Nt, Nt, Nt))
-            Rd_states[(agenti, agentj)] = np.zeros((Nt, Nt, Nt))
+            Sy_states[(agenti, agentj)] = np.zeros(
+                (Nt, p.shape[agenti], p.shape[agentj])
+            )
+            Rd_states[(agenti, agentj)] = np.zeros(
+                (Nt, p.shape[agenti], p.shape[agentj])
+            )
     I_R_sp = {cc: np.zeros((Nt)) for cc in combs}
     I_S_sp = {cc: np.zeros((Nt)) for cc in combs[Nvars:]}
 
@@ -167,29 +172,33 @@ def surd_states(p: np.ndarray) -> Tuple[Dict, Dict, Dict, float, float]:
                 # Index i is the variable over which we are calculating sp causality
                 p_i_ = p.sum(axis=(0, *noi_), keepdims=True)
                 p_ti_ = p.sum(axis=noi_, keepdims=True)
-                p_i__t = p_ti_ / p_s
-                p_t_i_ = p_ti_ / p_i_
+                p_i__t = it.safe_div(p_ti_, p_s)
+                p_t_i_ = it.safe_div(p_ti_, p_i_)
 
                 # Index j is the variable with the largest sp mutual info after variable i
                 p_j_ = p.sum(axis=(0, *noj_), keepdims=True)
                 p_tj_ = p.sum(axis=noj_, keepdims=True)
-                p_j__t = p_tj_ / p_s
-                p_t_j_ = p_tj_ / p_j_
+                p_j__t = it.safe_div(p_tj_, p_s)
+                p_t_j_ = it.safe_div(p_tj_, p_j_)
 
-                # Sum over all indices not involved in the causality
-                if Nvars != 2:
-                    Rd_states[tuple(red_vars)][t, :, :] = (
-                        (p * (it.mylog(p_t_i_ / p_t_j_)))
-                        .sum(axis=tuple(set(inds) - set(red_vars)))
-                        .squeeze()[t]
-                    )
-                elif Nvars == 2:
-                    p_t_j_ = p.sum(axis=(1, 2), keepdims=True)
-                    Rd_states[tuple(red_vars)][t, :, :] = (
-                        (p * (it.mylog(p_t_i_ / p_t_j_)))
-                        .sum(axis=tuple(set(inds) - set(red_vars)))
-                        .squeeze()[t]
-                    )
+                # Rd_states is a per-pair structure (Nt, Nbins_i, Nbins_j); the
+                # trigger condition can fire with ``red_vars`` of other sizes
+                # when there are duplicate or zero entries in the sorted
+                # specific MI, so only assign when the key is one of the
+                # initialized pairs.
+                rd_key = tuple(red_vars)
+                if rd_key in Rd_states:
+                    if Nvars != 2:
+                        Rd_states[rd_key][t, :, :] = (
+                            (p * it.mylog(it.safe_div(p_t_i_, p_t_j_)))
+                            .sum(axis=tuple(set(inds) - set(red_vars)))
+                            .squeeze()[t]
+                        )
+                    elif Nvars == 2:
+                        p_t_j_ = p.sum(axis=(1, 2), keepdims=True)
+                        Rd_states[rd_key][t, :, :] = (
+                            p * it.mylog(it.safe_div(p_t_i_, p_t_j_))
+                        )[t]
 
             if i_ == Nvars + np.count_nonzero(Di == 0) - 1 and len(ll) == 1:
                 noi_ = tuple(set(inds) - set(ll))
@@ -199,27 +208,27 @@ def surd_states(p: np.ndarray) -> Tuple[Dict, Dict, Dict, float, float]:
                 # Index i is the variable over which we are calculating sp causality
                 p_i_ = p.sum(axis=(0, *noi_), keepdims=True)
                 p_ti_ = p.sum(axis=noi_, keepdims=True)
-                p_i__t = p_ti_ / p_s
-                p_t_i_ = p_ti_ / p_i_
+                p_i__t = it.safe_div(p_ti_, p_s)
+                p_t_i_ = it.safe_div(p_ti_, p_i_)
 
                 # Index j is the variable with the largest sp mutual info after variable i
                 p_j_ = p.sum(axis=(0, *noj_), keepdims=True)
                 p_tj_ = p.sum(axis=noj_, keepdims=True)
-                p_j__t = p_tj_ / p_s
-                p_t_j_ = p_tj_ / p_j_
+                p_j__t = it.safe_div(p_tj_, p_s)
+                p_t_j_ = it.safe_div(p_tj_, p_j_)
 
                 # Joint probability of target, and sources i and j
                 p_tij_ = p.sum(axis=noij_, keepdims=True)
 
                 if Di[i_ - 1] > 1e-10:
                     Un_states[ll][t, :] = (
-                        (p_tij_ * (it.mylog(p_t_i_ / p_t_j_)))
+                        (p_tij_ * it.mylog(it.safe_div(p_t_i_, p_t_j_)))
                         .sum(axis=tuple(set(lab[i_ - 1])))
                         .squeeze()[t]
                     )
                 else:
                     Un_states[ll][t, :] = (
-                        (p_tij_ * (it.mylog(p_t_i_ / p_s)))
+                        (p_tij_ * it.mylog(it.safe_div(p_t_i_, p_s)))
                         .sum(axis=tuple(set(lab[i_ - 1])))
                         .squeeze()[t]
                     )
@@ -232,20 +241,20 @@ def surd_states(p: np.ndarray) -> Tuple[Dict, Dict, Dict, float, float]:
                 # Index i is the variable over which we are calculating sp causality
                 p_i_ = p.sum(axis=(0, *noi_), keepdims=True)
                 p_ti_ = p.sum(axis=noi_, keepdims=True)
-                p_i__t = p_ti_ / p_s
-                p_t_i_ = p_ti_ / p_i_
+                p_i__t = it.safe_div(p_ti_, p_s)
+                p_t_i_ = it.safe_div(p_ti_, p_i_)
 
                 # Index j is the variable with the largest sp mutual info after variable i
                 p_j_ = p.sum(axis=(0, *noj_), keepdims=True)
                 p_tj_ = p.sum(axis=noj_, keepdims=True)
-                p_j__t = p_tj_ / p_s
-                p_t_j_ = p_tj_ / p_j_
+                p_j__t = it.safe_div(p_tj_, p_s)
+                p_t_j_ = it.safe_div(p_tj_, p_j_)
 
                 # Joint probability of target, and sources i and j
                 p_tij_ = p.sum(axis=noij_, keepdims=True)
 
                 Sy_states[ll][t, :, :] = (
-                    (p_tij_ * (it.mylog(p_t_i_ / p_t_j_)))
+                    (p_tij_ * it.mylog(it.safe_div(p_t_i_, p_t_j_)))
                     .sum(axis=tuple(set(lab[i_ - 1]) - set(ll)))
                     .squeeze()[t]
                 )
@@ -628,6 +637,9 @@ def plot_states(
             side.set_linewidth(1.5)
 
     # === Save and return ===
+    save_dir = os.path.dirname(save_path)
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
     fig.savefig(save_path, bbox_inches="tight")
     plt.show()
 
@@ -690,6 +702,18 @@ def plot_states_3d(data, bins, title, level=0.5, color=my_colors["redundant"]):
     ax1.set_title(title)
     # 3D view
     ax1.view_init(elev=30, azim=135)
+
+    # Draw the right-most vertical edge of the bounding box (at xmin, ymin
+    # for the default ``view_init(elev=30, azim=135)``). Matplotlib's pane
+    # rendering can leave this seam missing depending on version.
+    ax1.plot(
+        [x_vals[0], x_vals[0]],
+        [y_vals[0]*1.1, y_vals[0]*1.1],
+        [z_vals[0]*1.1, z_vals[-1]],
+        color="black",
+        linewidth=1.5,
+        zorder=10,
+    )
 
     # x_line = bins[0]
     # y_line = np.zeros_like(x_line)
