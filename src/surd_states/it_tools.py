@@ -37,6 +37,29 @@ def mylog(x):
     return log_values
 
 
+def safe_div(num, den):
+    """
+    Element-wise division that returns 0 where the denominator is 0.
+
+    Conditional probabilities of the form p(x|y) are undefined when p(y) = 0;
+    by the standard 0 * log(0) = 0 convention, treating the ratio as 0 at
+    those entries yields the same result as the unobserved state contributing
+    nothing — without the NaN/inf propagation produced by naive division.
+
+    Parameters
+    ----------
+    num, den : np.ndarray
+        Numerator and denominator, broadcastable to a common shape.
+
+    Returns
+    -------
+    np.ndarray
+        Element-wise num / den, with 0 wherever den == 0.
+    """
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(den != 0, num / den, 0.0)
+
+
 def entropy(p):
     """
     Compute the entropy of a discrete probability distribution function.
