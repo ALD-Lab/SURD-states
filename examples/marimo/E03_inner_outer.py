@@ -51,10 +51,11 @@ def _():
 
 
 @app.cell
-def _(sio):
-    _data = sio.loadmat("../data/tbl_inner_outer.mat")
-    X = _data["u"]
-    time_plus = _data["t"]
+def _(np, sio):
+    # Full record (2 x 19,990,000 samples), stored in two parts to stay under GitHub's file-size limit
+    _parts = [sio.loadmat(f"../data/tbl_inner_outer_part{_k}.mat") for _k in (1, 2)]
+    X = np.hstack([_p["u"] for _p in _parts])
+    time_plus = _parts[0]["t"]
     nvars = X.shape[0]
     nbins = 25
     max_lag = 100
