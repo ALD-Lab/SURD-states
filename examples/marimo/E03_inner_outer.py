@@ -52,9 +52,15 @@ def _():
 
 @app.cell
 def _(np, sio):
-    # Full record (2 x 19,990,000 samples), stored in two parts to stay under GitHub's file-size limit
-    _parts = [sio.loadmat(f"../data/tbl_inner_outer_part{_k}.mat") for _k in (1, 2)]
-    X = np.hstack([_p["u"] for _p in _parts])
+    # Number of samples to use. The full record has 19,990,000 samples per signal, stored in two parts
+    # to stay under GitHub's file-size limit. The default runs in about a minute. Set N_SAMPLES = None to use
+    # the full record, as in the paper (about 3 minutes). With the default, the outer-to-inner causality
+    # peaks at Delta t+ ~ 37; the full record gives Delta t+ ~ 58, the value reported in the paper.
+    N_SAMPLES = 3_000_000
+
+    _nparts = 1 if (N_SAMPLES is not None and N_SAMPLES <= 9_995_000) else 2
+    _parts = [sio.loadmat(f"../data/tbl_inner_outer_part{_k}.mat") for _k in range(1, _nparts + 1)]
+    X = np.hstack([_p["u"] for _p in _parts])[:, :N_SAMPLES]
     time_plus = _parts[0]["t"]
     nvars = X.shape[0]
     nbins = 25
@@ -113,7 +119,7 @@ def _(
                 I_R, I_S, MI, _info_leak, *_ = surd.surd_states(
                     _hist
                 )  # Prepare lagged joint data
-                H = it.entropy_nvars(_hist, (0,))
+                H = it.entropy_nvars(_hist / _hist.sum(), (0,))
                 single_keys = [k for k in I_R if len(k) == 1 and k != (_i + 1,)]
                 unique_lag[_i, n_idx] = (
                     sum((I_R[k] for k in single_keys)) / H
