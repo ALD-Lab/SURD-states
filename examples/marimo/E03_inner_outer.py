@@ -52,10 +52,8 @@ def _():
 
 @app.cell
 def _(np, sio):
-    # Number of samples to use. None uses the full record, 19,990,000 samples per signal, as in the paper
-    # (about 3 minutes); it is stored in two parts to stay under GitHub's file-size limit. For a quick test
-    # set N_SAMPLES = 3_000_000 (about a minute); the outer-to-inner causality then peaks at Delta t+ ~ 37
-    # instead of the Delta t+ ~ 58 obtained with the full record and reported in the paper.
+    # Samples per signal. None uses the full record (19,990,000), as in the paper.
+    # N_SAMPLES = 3_000_000 runs faster but shifts the outer-to-inner peak from Delta t+ = 58 to 37.
     N_SAMPLES = None
 
     _nparts = 1 if (N_SAMPLES is not None and N_SAMPLES <= 9_995_000) else 2
