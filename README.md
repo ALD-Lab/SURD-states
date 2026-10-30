@@ -99,7 +99,7 @@ Open ``docs/build/html/index.html`` in your browser to view the result.
 If you use our method in your research or software, please cite the following paper:
 
 ```bibtex
-@article{martinez2025,
+@article{surd-states,
   author  = {Mart{\'i}nez-S{\'a}nchez, {\'A}lvaro and Lozano-Dur{\'a}n, Adri{\'a}n},
   title   = {Observational causality by states and interaction type for scientific discovery},
   journal = {Communications Physics},
