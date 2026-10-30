@@ -1,5 +1,7 @@
 # Decomposition of causality by states and interaction type
 
+> **This code now lives in [SURD](https://github.com/ALD-Lab/SURD).** Install it with `pip install surd` and use it with `from surd import states`. The functions and their results are the same as in this repository, which is kept for reference.
+
 _A Python repository for decomposing synergistic, unique, and redundant causalities by states._
 
 ## Introduction
